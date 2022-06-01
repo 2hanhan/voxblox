@@ -75,6 +75,7 @@ class MeshLayer {
   /**
    * Gets a mesh by the mesh index it if already exists,
    * otherwise allocates a new one.
+   * 使用index获取mesh，如果没有就在创建一个新的。
    */
   inline typename Mesh::Ptr allocateMeshPtrByIndex(const BlockIndex& index) {
     typename MeshMap::iterator it = mesh_map_.find(index);

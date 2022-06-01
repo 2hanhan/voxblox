@@ -56,6 +56,8 @@ TsdfServer::TsdfServer(const ros::NodeHandle& nh,
 
   nh_private_.param("pointcloud_queue_size", pointcloud_queue_size_,
                     pointcloud_queue_size_);
+
+  // - 处理输入点云的回调函数
   pointcloud_sub_ = nh_.subscribe("pointcloud", pointcloud_queue_size_,
                                   &TsdfServer::insertPointcloud, this);
 
@@ -127,10 +129,11 @@ TsdfServer::TsdfServer(const ros::NodeHandle& nh,
       "publish_map", &TsdfServer::publishTsdfMapCallback, this);
 
   // If set, use a timer to progressively integrate the mesh.
-  double update_mesh_every_n_sec = 1.0;
+  double update_mesh_every_n_sec = 1.0;  // mesh更新的频率
   nh_private_.param("update_mesh_every_n_sec", update_mesh_every_n_sec,
                     update_mesh_every_n_sec);
 
+  // - 根据设置频率更新mesh，用于可视化
   if (update_mesh_every_n_sec > 0.0) {
     update_mesh_timer_ =
         nh_private_.createTimer(ros::Duration(update_mesh_every_n_sec),
@@ -210,11 +213,20 @@ void TsdfServer::getServerConfigFromRosParam(
   color_map_->setMaxValue(intensity_max_value);
 }
 
+/**
+ * @brief 处理深度点云(可能也要颜色和强度信息)生成更新包含tsdf信息的voxel
+ *
+ * @param pointcloud_msg
+ * @param T_G_C
+ * @param is_freespace_pointcloud
+ */
 void TsdfServer::processPointCloudMessageAndInsert(
     const sensor_msgs::PointCloud2::Ptr& pointcloud_msg,
     const Transformation& T_G_C, const bool is_freespace_pointcloud) {
+  //进行PCL点云的格式转换
   // Convert the PCL pointcloud into our awesome format.
 
+  //检查pcl点云构成，1. 是否包含颜色信息，2. 是否包含强度信息
   // Horrible hack fix to fix color parsing colors in PCL.
   bool color_pointcloud = false;
   bool has_intensity = false;
@@ -231,6 +243,7 @@ void TsdfServer::processPointCloudMessageAndInsert(
   Colors colors;
   timing::Timer ptcloud_timer("ptcloud_preprocess");
 
+  //根据PCL点云格式类型进行数据格式转换
   // Convert differently depending on RGB or I type.
   if (color_pointcloud) {
     pcl::PointCloud<pcl::PointXYZRGB> pointcloud_pcl;
@@ -251,6 +264,7 @@ void TsdfServer::processPointCloudMessageAndInsert(
   ptcloud_timer.Stop();
 
   Transformation T_G_C_refined = T_G_C;
+  // 可以选择使用ICP对齐进一步细化位姿，但是会增加耗时
   if (enable_icp_) {
     timing::Timer icp_timer("icp");
     if (!accumulate_icp_corrections_) {
@@ -303,6 +317,7 @@ void TsdfServer::processPointCloudMessageAndInsert(
   }
 
   ros::WallTime start = ros::WallTime::now();
+  // - 处理点云生成tsdf的voxel
   integratePointcloud(T_G_C_refined, points_C, colors, is_freespace_pointcloud);
   ros::WallTime end = ros::WallTime::now();
   if (verbose_) {
@@ -322,7 +337,15 @@ void TsdfServer::processPointCloudMessageAndInsert(
   newPoseCallback(T_G_C);
 }
 
-// Checks if we can get the next message from queue.
+/**
+ * @brief Checks if we can get the next message from queue
+ *  尝试获取queue里点云所在的相机frame的位姿以及对应的点云
+ * @param queue
+ * @param pointcloud_msg
+ * @param T_G_C
+ * @return true
+ * @return false
+ */
 bool TsdfServer::getNextPointcloudFromQueue(
     std::queue<sensor_msgs::PointCloud2::Ptr>* queue,
     sensor_msgs::PointCloud2::Ptr* pointcloud_msg, Transformation* T_G_C) {
@@ -350,12 +373,19 @@ bool TsdfServer::getNextPointcloudFromQueue(
   return false;
 }
 
+/**
+ * @brief 处理输入点云的回调函数
+ * 接收到点云后，在insertPointcloud中进行tsdf更新
+ *
+ * @param pointcloud_msg_in
+ */
 void TsdfServer::insertPointcloud(
     const sensor_msgs::PointCloud2::Ptr& pointcloud_msg_in) {
   if (pointcloud_msg_in->header.stamp - last_msg_time_ptcloud_ >
       min_time_between_msgs_) {
     last_msg_time_ptcloud_ = pointcloud_msg_in->header.stamp;
     // So we have to process the queue anyway... Push this back.
+    //把点云push到一个队列里，这样点云如果积压来不及处理也可以慢慢一条条处理
     pointcloud_queue_.push(pointcloud_msg_in);
   }
 
@@ -404,6 +434,14 @@ void TsdfServer::insertFreespacePointcloud(
   }
 }
 
+/**
+ * @brief 使用点云生成voxel的TSDF
+ *
+ * @param T_G_C
+ * @param ptcloud_C
+ * @param colors
+ * @param is_freespace_pointcloud
+ */
 void TsdfServer::integratePointcloud(const Transformation& T_G_C,
                                      const Pointcloud& ptcloud_C,
                                      const Colors& colors,
@@ -490,6 +528,10 @@ void TsdfServer::publishPointclouds() {
   }
 }
 
+/**
+ * @brief 更新mesh
+ *
+ */
 void TsdfServer::updateMesh() {
   if (verbose_) {
     ROS_INFO("Updating mesh.");
@@ -617,6 +659,10 @@ bool TsdfServer::publishTsdfMapCallback(std_srvs::Empty::Request& /*request*/,
   return true;
 }
 
+/**
+ * @brief 更新mesh
+ *
+ */
 void TsdfServer::updateMeshEvent(const ros::TimerEvent& /*event*/) {
   updateMesh();
 }

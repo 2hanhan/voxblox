@@ -146,7 +146,16 @@ void TsdfIntegratorBase::updateLayerWithStoredBlocks() {
   temp_block_map_.clear();
 }
 
-// Updates tsdf_voxel. Thread safe.
+/**
+ * @brief Updates tsdf_voxel. Thread safe.
+ * 使用tsdf更新voxel
+ * @param origin
+ * @param point_G 世界坐标系下的点
+ * @param global_voxel_idx
+ * @param color
+ * @param weight
+ * @param tsdf_voxel
+ */
 void TsdfIntegratorBase::updateTsdfVoxel(const Point& origin,
                                          const Point& point_G,
                                          const GlobalIndex& global_voxel_idx,
@@ -154,15 +163,20 @@ void TsdfIntegratorBase::updateTsdfVoxel(const Point& origin,
                                          TsdfVoxel* tsdf_voxel) {
   DCHECK(tsdf_voxel != nullptr);
 
+  //计算voxel中心的x,y,z坐标
   const Point voxel_center =
       getCenterPointFromGridIndex(global_voxel_idx, voxel_size_);
 
+  //计算voxel中心到原点的直线距离，计算观察到的平均点到原点的直线距离。
+  //原点到voxel的射线和平均点到原点的射线一般不会完全共线，
+  //因此在这个函数里会voxel的射线投影到平均点的射线上，再做个减法获得sdf。
   const float sdf = computeDistance(origin, point_G, voxel_center);
 
   float updated_weight = weight;
   // Compute updated weight in case we use weight dropoff. It's easier here
   // that in getVoxelWeight as here we have the actual SDF for the voxel
-  // already computed.
+  // already computed
+  //更新voxel的权重.
   const FloatingPoint dropoff_epsilon = voxel_size_;
   if (config_.use_weight_dropoff && sdf < -dropoff_epsilon) {
     updated_weight = weight * (config_.default_truncation_distance + sdf) /
@@ -176,6 +190,7 @@ void TsdfIntegratorBase::updateTsdfVoxel(const Point& origin,
   // space parts of other rays which pass through the corresponding voxels.
   // This can be useful for creating a TSDF map from sparse sensor data (e.g.
   // visual features from a SLAM system). By default, this option is disabled.
+  //通过将占用区域的权重（| sdf |<截断距离）乘以一个因子，应对稀疏地图点云的情况
   if (config_.use_sparsity_compensation_factor) {
     if (std::abs(sdf) < config_.default_truncation_distance) {
       updated_weight *= config_.sparsity_compensation_factor;
@@ -198,13 +213,17 @@ void TsdfIntegratorBase::updateTsdfVoxel(const Point& origin,
       new_weight;
 
   // color blending is expensive only do it close to the surface
+  //更新rgb颜色(如果有的话)，并对sdf进行截断得到tsdf
   if (std::abs(sdf) < config_.default_truncation_distance) {
     tsdf_voxel->color = Color::blendTwoColors(
         tsdf_voxel->color, tsdf_voxel->weight, color, updated_weight);
   }
-  tsdf_voxel->distance =
-      (new_sdf > 0.0) ? std::min(config_.default_truncation_distance, new_sdf)
-                      : std::max(-config_.default_truncation_distance, new_sdf);
+  //截断距离
+  tsdf_voxel->distance = (new_sdf > 0.0)
+                             ? std::min(config_.default_truncation_distance,
+                                        new_sdf)  //大于0的情况，取最小的
+                             : std::max(-config_.default_truncation_distance,
+                                        new_sdf);  //小于0的情况，取最大的
   tsdf_voxel->weight = std::min(config_.max_weight, new_weight);
 }
 
@@ -213,6 +232,7 @@ void TsdfIntegratorBase::updateTsdfVoxel(const Point& origin,
 // To do this, project the voxel_center onto the ray from origin to point G.
 // Then check if the the magnitude of the vector is smaller or greater than
 // the original distance...
+// voxel是在平面的前面还是后面
 float TsdfIntegratorBase::computeDistance(const Point& origin,
                                           const Point& point_G,
                                           const Point& voxel_center) const {
@@ -239,6 +259,14 @@ float TsdfIntegratorBase::getVoxelWeight(const Point& point_C) const {
   return 0.0f;
 }
 
+/**
+ * @brief 普通方法对每一个图像点都投影射线
+ *
+ * @param T_G_C
+ * @param points_C
+ * @param colors
+ * @param freespace_points
+ */
 void SimpleTsdfIntegrator::integratePointCloud(const Transformation& T_G_C,
                                                const Pointcloud& points_C,
                                                const Colors& colors,
@@ -304,6 +332,16 @@ void SimpleTsdfIntegrator::integrateFunction(const Transformation& T_G_C,
   }
 }
 
+/**
+ * @brief
+ * Merged方法先计算哪些3d点投影到了相同的voxel里，
+ * 然后取这些点的坐标平均数，视为一个点，只从那个平均点投影射线更新。
+ *
+ * @param T_G_C
+ * @param points_C
+ * @param colors
+ * @param freespace_points
+ */
 void MergedTsdfIntegrator::integratePointCloud(const Transformation& T_G_C,
                                                const Pointcloud& points_C,
                                                const Colors& colors,
@@ -337,6 +375,16 @@ void MergedTsdfIntegrator::integratePointCloud(const Transformation& T_G_C,
   integrate_timer.Stop();
 }
 
+/**
+ * @brief 把一些属于同一个voxel的point进行捆绑近似
+ *
+ * @param T_G_C
+ * @param points_C
+ * @param freespace_points
+ * @param index_getter
+ * @param voxel_map
+ * @param clear_map
+ */
 void MergedTsdfIntegrator::bundleRays(
     const Transformation& T_G_C, const Pointcloud& points_C,
     const bool freespace_points, ThreadSafeIndex* index_getter,
@@ -345,23 +393,26 @@ void MergedTsdfIntegrator::bundleRays(
   DCHECK(voxel_map != nullptr);
   DCHECK(clear_map != nullptr);
 
+  //遍历点云获得世界坐标系下的点
   size_t point_idx;
   while (index_getter->getNextIndex(&point_idx)) {
     const Point& point_C = points_C[point_idx];
     bool is_clearing;
+    //距离相机太近或太远之类，不Valid
     if (!isPointValid(point_C, freespace_points, &is_clearing)) {
       continue;
     }
 
-    const Point point_G = T_G_C * point_C;
+    const Point point_G = T_G_C * point_C;  // 转换到世界坐标系下
 
-    GlobalIndex voxel_index =
-        getGridIndexFromPoint<GlobalIndex>(point_G, voxel_size_inv_);
+    GlobalIndex voxel_index = getGridIndexFromPoint<GlobalIndex>(
+        point_G, voxel_size_inv_);  //计算世界坐标系下的点在哪个voxel里
 
     if (is_clearing) {
-      (*clear_map)[voxel_index].push_back(point_idx);
+      (*clear_map)[voxel_index].push_back(point_idx);  //清除不valid的点
     } else {
-      (*voxel_map)[voxel_index].push_back(point_idx);
+      (*voxel_map)[voxel_index].push_back(
+          point_idx);  // 投影到一个voxel_index下的不同poin_idx都会被push到voxel_map里。
     }
   }
 
@@ -370,6 +421,17 @@ void MergedTsdfIntegrator::bundleRays(
           << " clear rays.";
 }
 
+/**
+ * @brief 遍历一个voxel中所有的点，求取平均参数，进行tsdf的voxel生成更新
+ *
+ * @param T_G_C
+ * @param points_C
+ * @param colors
+ * @param enable_anti_grazing
+ * @param clearing_ray 当前voxel中是否只取第一个点
+ * @param kv *it voxel_map中的一个voxel
+ * @param voxel_map
+ */
 void MergedTsdfIntegrator::integrateVoxel(
     const Transformation& T_G_C, const Pointcloud& points_C,
     const Colors& colors, bool enable_anti_grazing, bool clearing_ray,
@@ -384,6 +446,7 @@ void MergedTsdfIntegrator::integrateVoxel(
   Point merged_point_C = Point::Zero();
   FloatingPoint merged_weight = 0.0;
 
+  //求得属于一个voxel内的点的平均点和颜色
   for (const size_t pt_idx : kv.second) {
     const Point& point_C = points_C[pt_idx];
     const Color& color = colors[pt_idx];
@@ -406,6 +469,7 @@ void MergedTsdfIntegrator::integrateVoxel(
 
   const Point merged_point_G = T_G_C * merged_point_C;
 
+  //利用平均点投影射线
   RayCaster ray_caster(origin, merged_point_G, clearing_ray,
                        config_.voxel_carving_enabled, config_.max_ray_length_m,
                        voxel_size_inv_, config_.default_truncation_distance);
@@ -415,6 +479,7 @@ void MergedTsdfIntegrator::integrateVoxel(
     if (enable_anti_grazing) {
       // Check if this one is already the the block hash map for this
       // insertion. Skip this to avoid grazing.
+      //如果已经存在hashmap映射则跳过
       if ((clearing_ray || global_voxel_idx != kv.first) &&
           voxel_map.find(global_voxel_idx) != voxel_map.end()) {
         continue;
@@ -423,6 +488,9 @@ void MergedTsdfIntegrator::integrateVoxel(
 
     Block<TsdfVoxel>::Ptr block = nullptr;
     BlockIndex block_idx;
+    //检测该voxel是否已经属于某个block还是并不属于任何一个block，
+    //如果不，则新建一个block分配空间。
+    //返回在这个block里的对应index的voxel
     TsdfVoxel* voxel =
         allocateStorageAndGetVoxelPtr(global_voxel_idx, &block, &block_idx);
 
@@ -431,6 +499,18 @@ void MergedTsdfIntegrator::integrateVoxel(
   }
 }
 
+/**
+ * @brief 遍历所有的voxels
+ *
+ * @param T_G_C
+ * @param points_C
+ * @param colors
+ * @param enable_anti_grazing
+ * @param clearing_ray 当前voxel中是否只取第一个点
+ * @param voxel_map
+ * @param clear_map
+ * @param thread_idx
+ */
 void MergedTsdfIntegrator::integrateVoxels(
     const Transformation& T_G_C, const Pointcloud& points_C,
     const Colors& colors, bool enable_anti_grazing, bool clearing_ray,
@@ -456,6 +536,17 @@ void MergedTsdfIntegrator::integrateVoxels(
   }
 }
 
+/**
+ * @brief 多线程的射线投影
+ *
+ * @param T_G_C
+ * @param points_C
+ * @param colors
+ * @param enable_anti_grazing
+ * @param clearing_ray
+ * @param voxel_map
+ * @param clear_map
+ */
 void MergedTsdfIntegrator::integrateRays(
     const Transformation& T_G_C, const Pointcloud& points_C,
     const Colors& colors, bool enable_anti_grazing, bool clearing_ray,
@@ -552,6 +643,14 @@ void FastTsdfIntegrator::integrateFunction(const Transformation& T_G_C,
   }
 }
 
+/**
+ * @brief
+ *
+ * @param T_G_C
+ * @param points_C
+ * @param colors
+ * @param freespace_points
+ */
 void FastTsdfIntegrator::integratePointCloud(const Transformation& T_G_C,
                                              const Pointcloud& points_C,
                                              const Colors& colors,

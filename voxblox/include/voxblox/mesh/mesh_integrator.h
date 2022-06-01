@@ -129,7 +129,12 @@ class MeshIntegrator {
     }
   }
 
-  /// Generates mesh from the tsdf layer.
+  /**
+   * @brief Generates mesh from the tsdf layer.
+   * 使用tsdf生成mesh地图
+   * @param only_mesh_updated_blocks
+   * @param clear_updated_flag
+   */
   void generateMesh(bool only_mesh_updated_blocks, bool clear_updated_flag) {
     CHECK(!clear_updated_flag || (sdf_layer_mutable_ != nullptr))
         << "If you would like to modify the updated flag in the blocks, please "
@@ -137,12 +142,14 @@ class MeshIntegrator {
         << "layer!";
     BlockIndexList all_tsdf_blocks;
     if (only_mesh_updated_blocks) {
+      //返回所有voxel有更新的block的index
       sdf_layer_const_->getAllUpdatedBlocks(Update::kMesh, &all_tsdf_blocks);
     } else {
       sdf_layer_const_->getAllAllocatedBlocks(&all_tsdf_blocks);
     }
 
-    // Allocate all the mesh memory
+    // mesh和block有对应关系，如果有新建的block而没有对应的mesh，则为mesh分配新的空间。
+    //  Allocate all the mesh memory
     for (const BlockIndex& block_index : all_tsdf_blocks) {
       mesh_layer_->allocateMeshPtrByIndex(block_index);
     }
@@ -150,6 +157,7 @@ class MeshIntegrator {
     std::unique_ptr<ThreadSafeIndex> index_getter(
         new MixedThreadSafeIndex(all_tsdf_blocks.size()));
 
+    //多线程运行generateMeshBlocksFunction函数
     std::list<std::thread> integration_threads;
     for (size_t i = 0; i < config_.integrator_threads; ++i) {
       integration_threads.emplace_back(
@@ -172,6 +180,7 @@ class MeshIntegrator {
         << "layer!";
 
     size_t list_idx;
+    //每个线程要遍历`all_tsdf_blocks`里的部分block
     while (index_getter->getNextIndex(&list_idx)) {
       const BlockIndex& block_idx = all_tsdf_blocks[list_idx];
       updateMeshForBlock(block_idx);
@@ -183,6 +192,12 @@ class MeshIntegrator {
     }
   }
 
+  /**
+   * @brief 对每个block提取mesh
+   *
+   * @param block
+   * @param mesh
+   */
   void extractBlockMesh(typename Block<VoxelType>::ConstPtr block,
                         Mesh::Ptr mesh) {
     DCHECK(block != nullptr);
@@ -196,6 +211,7 @@ class MeshIntegrator {
       for (voxel_index.y() = 0; voxel_index.y() < vps - 1; ++voxel_index.y()) {
         for (voxel_index.z() = 0; voxel_index.z() < vps - 1;
              ++voxel_index.z()) {
+          //获取block里每一个voxel的x,y,z坐标
           Point coords = block->computeCoordinatesFromVoxelIndex(voxel_index);
           extractMeshInsideBlock(*block, voxel_index, coords, &next_mesh_index,
                                  mesh.get());
@@ -239,6 +255,7 @@ class MeshIntegrator {
   }
 
   virtual void updateMeshForBlock(const BlockIndex& block_index) {
+    //根据已建立的mesh和block的对应关系，找到各自的指针
     Mesh::Ptr mesh = mesh_layer_->getMeshPtrByIndex(block_index);
     mesh->clear();
     // This block should already exist, otherwise it makes no sense to update
@@ -268,7 +285,9 @@ class MeshIntegrator {
 
     Eigen::Matrix<FloatingPoint, 3, 8> cube_coord_offsets =
         cube_index_offsets_.cast<FloatingPoint>() * voxel_size_;
+    // 8个顶点的坐标值
     Eigen::Matrix<FloatingPoint, 3, 8> corner_coords;
+    // 8个顶点的stf值
     Eigen::Matrix<FloatingPoint, 8, 1> corner_sdf;
     bool all_neighbors_observed = true;
 
@@ -284,6 +303,7 @@ class MeshIntegrator {
       corner_coords.col(i) = coords + cube_coord_offsets.col(i);
     }
 
+    //立方体的8个顶点都观测到，建立marching cube的
     if (all_neighbors_observed) {
       MarchingCubes::meshCube(corner_coords, corner_sdf, next_mesh_index, mesh);
     }

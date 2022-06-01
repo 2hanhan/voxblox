@@ -74,14 +74,18 @@ class MarchingCubes {
                        VertexIndex* next_index, Mesh* mesh) {
     DCHECK(next_index != NULL);
     DCHECK(mesh != NULL);
+    //根据8个顶点的sdf,获得一个8位的int常量index，该量上的每一位代表tsdf的正负，如果为正则那一位为1，否则为0
     const int index = calculateVertexConfiguration(vertex_sdf);
 
     // No edges in this cube.
+    //全是0，cube在表面内部
     if (index == 0) {
       return;
     }
 
+    // cube的12条边
     Eigen::Matrix<FloatingPoint, 3, 12> edge_vertex_coordinates;
+    // cube 边上的0点计算与线性差值
     interpolateEdgeVertices(vertex_coords, vertex_sdf,
                             &edge_vertex_coordinates);
 
@@ -89,15 +93,19 @@ class MarchingCubes {
 
     int table_col = 0;
     while (table_row[table_col] != -1) {
+      //保存mesh的三个顶点
       mesh->vertices.emplace_back(
           edge_vertex_coordinates.col(table_row[table_col + 2]));
       mesh->vertices.emplace_back(
           edge_vertex_coordinates.col(table_row[table_col + 1]));
       mesh->vertices.emplace_back(
           edge_vertex_coordinates.col(table_row[table_col]));
+
+      // mesh的顶点的index
       mesh->indices.push_back(*next_index);
       mesh->indices.push_back((*next_index) + 1);
       mesh->indices.push_back((*next_index) + 2);
+      //计算mesh的法向量
       const Point& p0 = mesh->vertices[*next_index];
       const Point& p1 = mesh->vertices[*next_index + 1];
       const Point& p2 = mesh->vertices[*next_index + 2];
@@ -107,13 +115,20 @@ class MarchingCubes {
       mesh->normals.push_back(n);
       mesh->normals.push_back(n);
       mesh->normals.push_back(n);
-      *next_index += 3;
-      table_col += 3;
+      *next_index += 3;  //指向下一个mesh3个顶点的指针
+      table_col += 3;    //当前的cube的过0点的边的指针
     }
   }
 
+  /**
+   * @brief 获取每个顶点的stf值的正负，确定平面的位置
+   *
+   * @param vertex_sdf
+   * @return int
+   */
   static int calculateVertexConfiguration(
       const Eigen::Matrix<FloatingPoint, 8, 1>& vertex_sdf) {
+    // |按照位或 运算符，移位操作
     return (vertex_sdf(0) < 0 ? (1 << 0) : 0) |
            (vertex_sdf(1) < 0 ? (1 << 1) : 0) |
            (vertex_sdf(2) < 0 ? (1 << 2) : 0) |
@@ -124,6 +139,13 @@ class MarchingCubes {
            (vertex_sdf(7) < 0 ? (1 << 7) : 0);
   }
 
+  /**
+   * @brief 计算cube需要差值的边，计算差值的0点的位置
+   *
+   * @param vertex_coords
+   * @param vertex_sdf
+   * @param edge_coords
+   */
   static void interpolateEdgeVertices(
       const Eigen::Matrix<FloatingPoint, 3, 8>& vertex_coords,
       const Eigen::Matrix<FloatingPoint, 8, 1>& vertex_sdf,
@@ -134,6 +156,7 @@ class MarchingCubes {
       const int edge0 = pairs[0];
       const int edge1 = pairs[1];
       // Only interpolate along edges where there is a zero crossing.
+      //对有sdf值有越过0变化的边进行差值
       if ((vertex_sdf(edge0) < 0 && vertex_sdf(edge1) >= 0) ||
           (vertex_sdf(edge0) >= 0 && vertex_sdf(edge1) < 0))
         edge_coords->col(i) = interpolateVertex(
@@ -143,8 +166,13 @@ class MarchingCubes {
   }
 
   /**
-   * Performs linear interpolation on two cube corners to find the approximate
-   * zero crossing (surface) value.
+   * @brief Performs linear interpolation on two cube corners to find the
+   * approximate zero crossing (surface) value. 进行线性差值获取过0点的边的位置
+   * @param vertex1
+   * @param vertex2
+   * @param sdf1
+   * @param sdf2
+   * @return Point
    */
   static inline Point interpolateVertex(const Point& vertex1,
                                         const Point& vertex2, float sdf1,

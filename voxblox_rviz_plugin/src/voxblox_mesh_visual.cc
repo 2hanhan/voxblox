@@ -100,6 +100,7 @@ void VoxbloxMeshVisual::setMessage(const voxblox_msgs::Mesh::ConstPtr& msg) {
     voxblox::createConnectedMesh(mesh, &connected_mesh);
 
     // create ogre object
+    // rviz会根据ogre object的设置来决定如何可视化
     Ogre::ManualObject* ogre_object;
     const voxblox::AnyIndexHashMapType<
         Ogre::ManualObject*>::type::const_iterator it = object_map_.find(index);
@@ -128,9 +129,12 @@ void VoxbloxMeshVisual::setMessage(const voxblox_msgs::Mesh::ConstPtr& msg) {
 
     ogre_object->estimateVertexCount(connected_mesh.vertices.size());
     ogre_object->estimateIndexCount(connected_mesh.indices.size());
-    ogre_object->begin("BaseWhiteNoLighting",
-                       Ogre::RenderOperation::OT_TRIANGLE_LIST);
+    ogre_object->begin("BaseWhiteNoLighting",  //可视化打光方式
+                       Ogre::RenderOperation::OT_TRIANGLE_LIST);  //绘制三角形
 
+    //在选择了要绘制以三角形为基础的面片之后，就进入for循环，往ogre_object里push数据
+    //由于设置的是绘制三角形，所以这个循环每走三次，push进去三个点，ogre就会自动连接这三个点
+    //之后还需要push每个点的颜色,normal等，ogre会自动插值来决定三角面片的颜色
     for (size_t i = 0; i < connected_mesh.vertices.size(); ++i) {
       // note calling position changes what vertex the color and normal calls
       // point to

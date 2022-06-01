@@ -2,6 +2,13 @@
 
 namespace voxblox {
 
+/**
+ * @brief  计算哪些点会被投影到一个voxel里
+ *
+ * @param mode
+ * @param points_C
+ * @return ThreadSafeIndex*
+ */
 ThreadSafeIndex* ThreadSafeIndexFactory::get(const std::string& mode,
                                              const Pointcloud& points_C) {
   if (mode == "mixed") {
@@ -66,9 +73,20 @@ size_t SortedThreadSafeIndex::getNextIndexImpl(size_t sequential_idx) {
   return indices_and_squared_norms_[sequential_idx].first;
 }
 
-// This class assumes PRE-SCALED coordinates, where one unit = one voxel size.
-// The indices are also returned in this scales coordinate system, which should
-// map to voxel indices.
+/**
+ * @brief Construct a new Ray Caster:: Ray Caster object
+ * This class assumes PRE-SCALED coordinates, where one unit = one voxel size.
+ * The indices are also returned in this scales coordinate system, which should
+ * map to voxel indices.
+ * @param origin
+ * @param point_G
+ * @param is_clearing_ray
+ * @param voxel_carving_enabled 射线的开始点为原点(voxel_carving_enabled==true)
+ * @param max_ray_length_m
+ * @param voxel_size_inv
+ * @param truncation_distance 截断距离
+ * @param cast_from_origin 从原点开始，还是从终点开始，voxel索引的范围
+ */
 RayCaster::RayCaster(const Point& origin, const Point& point_G,
                      const bool is_clearing_ray,
                      const bool voxel_carving_enabled,
@@ -76,23 +94,31 @@ RayCaster::RayCaster(const Point& origin, const Point& point_G,
                      const FloatingPoint voxel_size_inv,
                      const FloatingPoint truncation_distance,
                      const bool cast_from_origin) {
+  //计算单位射线的长度，就是简单的求点到原点的差值，求得他们的norm(均方值)再每一个维度除以norm归一化。
   const Ray unit_ray = (point_G - origin).normalized();
 
   Point ray_start, ray_end;
   if (is_clearing_ray) {
     FloatingPoint ray_length = (point_G - origin).norm();
-    ray_length = std::min(std::max(ray_length - truncation_distance,
-                                   static_cast<FloatingPoint>(0.0)),
-                          max_ray_length_m);
+    ray_length = std::min(
+        std::max(
+            ray_length -
+                truncation_distance,  //射线长度减去截断距离，截断距离就是平面的+-Td的
+            static_cast<FloatingPoint>(0.0)),  //和0比较把距离相机太近的去除掉
+        max_ray_length_m);
+    //终止点为平均点后unit_ray * truncation_distance的位置。
     ray_end = origin + unit_ray * ray_length;
+    //是否是从相机开始的射线
     ray_start = voxel_carving_enabled ? origin : ray_end;
   } else {
+    // else中除了没计算ray_length,其他的虽然公式不一样但是结果都是一样的
     ray_end = point_G + unit_ray * truncation_distance;
     ray_start = voxel_carving_enabled
                     ? origin
                     : (point_G - unit_ray * truncation_distance);
   }
 
+  // voxel的索引范围，位置/voxel大小
   const Point start_scaled = ray_start * voxel_size_inv;
   const Point end_scaled = ray_end * voxel_size_inv;
 
@@ -107,7 +133,13 @@ RayCaster::RayCaster(const Point& start_scaled, const Point& end_scaled) {
   setupRayCaster(start_scaled, end_scaled);
 }
 
-// returns false if ray terminates at ray_index, true otherwise
+/**
+ * @brief returns false if ray terminates at ray_index, true otherwise
+ * 如果搜索完成index就返回false
+ * @param ray_index
+ * @return true
+ * @return false
+ */
 bool RayCaster::nextRayIndex(GlobalIndex* ray_index) {
   if (current_step_++ > ray_length_in_steps_) {
     return false;
@@ -133,6 +165,7 @@ void RayCaster::setupRayCaster(const Point& start_scaled,
     return;
   }
 
+  //首先获取射线开始位置和结束位置对应的voxel的三个方向的index的坐标以及差值
   curr_index_ = getGridIndexFromPoint<GlobalIndex>(start_scaled);
   const GlobalIndex end_index = getGridIndexFromPoint<GlobalIndex>(end_scaled);
   const GlobalIndex diff_index = end_index - curr_index_;
@@ -144,6 +177,7 @@ void RayCaster::setupRayCaster(const Point& start_scaled,
 
   const Ray ray_scaled = end_scaled - start_scaled;
 
+  // 每个维度(x,y,z)只可能为3个值, 1,-1或者0.
   ray_step_signs_ = AnyIndex(signum(ray_scaled.x()), signum(ray_scaled.y()),
                              signum(ray_scaled.z()));
 
