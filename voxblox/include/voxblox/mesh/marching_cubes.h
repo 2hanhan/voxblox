@@ -89,6 +89,9 @@ class MarchingCubes {
     interpolateEdgeVertices(vertex_coords, vertex_sdf,
                             &edge_vertex_coordinates);
 
+    //每3个cube的过0点可以构成一个mesh，
+    //但是点肯定是要复用的所有根据8位的int来索引这个
+    //不过为什么是256*16位的，最多就3*5个三角形，还有一个-1有用来存储停止位
     const int* table_row = kTriangleTable[index];
 
     int table_col = 0;
@@ -100,7 +103,6 @@ class MarchingCubes {
           edge_vertex_coordinates.col(table_row[table_col + 1]));
       mesh->vertices.emplace_back(
           edge_vertex_coordinates.col(table_row[table_col]));
-
       // mesh的顶点的index
       mesh->indices.push_back(*next_index);
       mesh->indices.push_back((*next_index) + 1);
