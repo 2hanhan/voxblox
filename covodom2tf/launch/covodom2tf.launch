@@ -1,0 +1,12 @@
+<launch>
+    <arg name="input_odom" default="/aft_mapped_to_init" />
+    <arg name="output_tf" default="/aft_mapped" />
+
+    <node name="covodom2tf_node" pkg="covodom2tf" type="covodom2tf_node" output="screen">
+        <!-- odom输入-->
+        <remap from="odometry" to="$(arg input_odom)" />
+        <!-- tf输出-->
+        <remap from="transform" to="$(arg output_tf)" />
+
+    </node>
+</launch>
