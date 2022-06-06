@@ -1,3 +1,12 @@
+# 安装
+> 不用用什么ssh下载，感觉就是自从github改成tokken不能账号密码直接登录后就不好使用了。
+- 主要就是两个输入
+  - `sensor_msgs/PointCloud2`消息类型的点云输入
+  - `geometry_msgs/TransformStamped`消息类型的从传感器到`world`坐标系的tf变换
+# 修改
+- 了一些lauch文件添加了rviz的可视化设置
+- 写了一份将里程计odometry的话题转化为tf的节点
+- 尝试了一些r3live的构建estf地图
 # Voxblox
 
 [![Build Test](https://github.com/ethz-asl/voxblox/actions/workflows/build_test.yml/badge.svg)](https://github.com/ethz-asl/voxblox/actions/workflows/build_test.yml)
