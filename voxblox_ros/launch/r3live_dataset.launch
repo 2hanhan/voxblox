@@ -1,0 +1,45 @@
+<?xml version="1.0" encoding="ISO-8859-15"?>
+<launch>
+  <arg name="play_bag" default="true" />
+  <arg name="bag_file" default="/home/wgq/voxbloxdataset/result.bag" />
+  <arg name="voxel_size" default="0.10" />
+  <arg name="process_every_nth_frame" default="5" />
+  <arg name="scale" default="0.5" />
+
+  <arg name="input_odom" default="/aft_mapped_to_init" />
+  <arg name="output_tf" default="aft_mapped" />
+
+  <node name="covodom2tf_node" pkg="covodom2tf" type="covodom2tf_node" output="screen">
+      <!-- odom输入-->
+      <remap from="odometry" to="$(arg input_odom)" />
+      <!-- tf输出-->
+      <remap from="transform" to="$(arg output_tf)" />
+  </node>
+
+  <node name="player" pkg="rosbag" type="play" output="screen" args=" -r 1.0 --clock $(arg bag_file)" if="$(arg play_bag)" />
+
+  <node name="voxblox_node" pkg="voxblox_ros" type="esdf_server" output="screen" args="-alsologtostderr" clear_params="true">
+    <!-- 点云输入-->
+    <remap from="pointcloud" to="/cloud_registered" /> 
+    <param name="tsdf_voxel_size" value="0.1" />
+    <param name="truncation_distance" value="0.3" />
+    <param name="color_mode" value="normals" />
+     <!-- 进行从世界frame到当前传感器frame的坐标转换-->
+    <param name="use_tf_transforms" value="ture" />
+    <remap from="transform"  to="$(arg output_tf)" />
+    <!-- 不进行ICP-->
+    <param name="enable_icp" value="false" />
+    <param name="icp_refine_roll_pitch" value="false" />
+    <param name="update_mesh_every_n_sec" value="1.0" />
+    <param name="mesh_min_weight" value="2" />
+    <param name="method" value="simple" />
+    <!-- 最大射线距离-->
+    <param name="max_ray_length_m" value="20.0" />
+    <param name="use_const_weight" value="true" />
+    <param name="world_frame" value="world" />
+    <param name="verbose" value="true" />
+    <param name="mesh_filename" value="$(find voxblox_ros)/mesh_results/$(anon basement).ply" />
+  </node>
+
+  <node pkg="rviz" type="rviz" name="rviz" required="true" args="-d $(find voxblox_ros)/rviz/r3live.rviz" />
+</launch>
