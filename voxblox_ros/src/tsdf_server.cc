@@ -61,6 +61,7 @@ TsdfServer::TsdfServer(const ros::NodeHandle& nh,
   pointcloud_sub_ = nh_.subscribe("pointcloud", pointcloud_queue_size_,
                                   &TsdfServer::insertPointcloud, this);
 
+  // - 发布的mesh可视化消息
   mesh_pub_ = nh_private_.advertise<voxblox_msgs::Mesh>("mesh", 1, true);
 
   // Publishing/subscribing to a layer from another node (when using this as
@@ -79,6 +80,7 @@ TsdfServer::TsdfServer(const ros::NodeHandle& nh,
                       &TsdfServer::insertFreespacePointcloud, this);
   }
 
+  // - 是否使用ICP细化位姿
   if (enable_icp_) {
     icp_transform_pub_ = nh_private_.advertise<geometry_msgs::TransformStamped>(
         "icp_transform", 1, true);
@@ -151,6 +153,11 @@ TsdfServer::TsdfServer(const ros::NodeHandle& nh,
   }
 }
 
+/**
+ * @brief 获取节点服务参数
+ *
+ * @param nh_private
+ */
 void TsdfServer::getServerConfigFromRosParam(
     const ros::NodeHandle& nh_private) {
   // Before subscribing, determine minimum time between messages.

@@ -32,7 +32,7 @@ namespace voxblox {
 
 namespace timing {
 
-const double kNumSecondsPerNanosecond = 1.e-9;
+const double kNumSecondsPerNanosecond = 1.e-9;  //进行计时单位的转换
 
 Timing& Timing::Instance() {
   static Timing t;
@@ -49,6 +49,7 @@ size_t Timing::GetHandle(std::string const& tag) {
   // Search for an existing tag.
   map_t::iterator i = Instance().tagMap_.find(tag);
   if (i == Instance().tagMap_.end()) {
+    //没有对应string=>handle就创建新的
     // If it is not there, create a tag.
     size_t handle = Instance().timers_.size();
     Instance().tagMap_[tag] = handle;
@@ -58,6 +59,7 @@ size_t Timing::GetHandle(std::string const& tag) {
     Instance().maxTagLength_ = std::max(Instance().maxTagLength_, tag.size());
     return handle;
   } else {
+    //搜索到了就返回string对应的handle
     return i->second;
   }
 }
@@ -75,6 +77,7 @@ std::string Timing::GetTag(size_t handle) {
   return tag;
 }
 
+//构造函数，调用开始计时，并通过string索引对应handle_
 // Class functions used for timing.
 Timer::Timer(size_t handle, bool constructStopped)
     : timing_(false), handle_(handle) {
@@ -104,7 +107,7 @@ void Timer::Stop() {
               .count()) *
       kNumSecondsPerNanosecond;
 
-  Timing::Instance().AddTime(handle_, dt);
+  Timing::Instance().AddTime(handle_, dt);  //将耗时放入累加器
   timing_ = false;
 }
 

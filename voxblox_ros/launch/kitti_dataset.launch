@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="ISO-8859-15"?>
 <launch>
   <arg name="play_bag" default="true" />
-  <!-- <arg name="bag_file" default="/path/to/drive35.bag"/> -->
+  <arg name="bag_file" default="/home/wgq/datas/KITTI/drive_0020.bag" />
   <arg name="process_every_nth_frame" default="1" />
   <arg name="voxel_size" default="0.25" />
   <arg name="scale" default="0.25" />
@@ -10,9 +10,9 @@
 
   <!-- These datasets can be created with the KITTI raw datasets: http://www.cvlibs.net/datasets/kitti/raw_data.php and kitti_to_rosbag: https://github.com/ethz-asl/kitti_to_rosbag -->
 
-  <node name="player" pkg="rosbag" type="play" output="screen" args=" -r 0.2 --clock $(arg bag_file)"  if="$(arg play_bag)"/>
+  <node name="player" pkg="rosbag" type="play" output="screen" args=" -r 0.2 --clock $(arg bag_file)" if="$(arg play_bag)" />
 
-   <!-- Run stereo_dense_reconstruction_node-->
+  <!-- Run stereo_dense_reconstruction_node-->
   <node ns="stereo_gray" name="stereo_image_proc" pkg="stereo_image_proc" type="stereo_image_proc" clear_params="true" output="screen">
     <remap from="left/image_raw" to="/cam02/image_raw" />
     <remap from="left/camera_info" to="/cam02/camera_info" />
@@ -21,7 +21,7 @@
     <param name="approximate_sync" value="true" />
     <param name="approximate_sync" value="true" />
 
-    <rosparam file="$(find voxblox_ros)/cfg/stereo/kitti_stereo_jager.yaml"/>
+    <rosparam file="$(find voxblox_ros)/cfg/stereo/kitti_stereo_jager.yaml" />
   </node>
 
   <node name="voxblox_node" pkg="voxblox_ros" type="tsdf_server" output="screen" args="-alsologtostderr" clear_params="true">
@@ -45,4 +45,5 @@
     <param name="mesh_filename" value="$(find voxblox_ros)/mesh_results/$(anon kitti).ply" />
   </node>
 
+  <node pkg="rviz" type="rviz" name="rviz" required="true" args="-d $(find voxblox_ros)/rviz/kitti.rviz" />
 </launch>

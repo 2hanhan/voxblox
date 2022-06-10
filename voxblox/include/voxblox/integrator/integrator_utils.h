@@ -146,6 +146,18 @@ inline void castRay(const Point& start_scaled, const Point& end_scaled,
  * Takes start and end in WORLD COORDINATES, does all pre-scaling and
  * sorting into hierarhical index.
  */
+
+/**
+ * @brief 以世界坐标为起点和终点，对层次索引进行所有预缩放和排序。
+ *
+ * @param start
+ * @param end
+ * @param voxels_per_side
+ * @param voxel_size
+ * @param truncation_distance
+ * @param voxel_carving_enabled
+ * @param hierarchical_idx_map
+ */
 inline void getHierarchicalIndexAlongRay(
     const Point& start, const Point& end, size_t voxels_per_side,
     FloatingPoint voxel_size, FloatingPoint truncation_distance,

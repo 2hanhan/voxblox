@@ -47,6 +47,7 @@ class Accumulator {
         min_(std::numeric_limits<T>::max()),
         max_(std::numeric_limits<T>::min()) {}
 
+  //往表里面添加数据，满了就重新从第一个位置存
   void Add(T sample) {
     if (window_samples_ < N) {
       samples_[window_samples_++] = sample;
@@ -70,8 +71,18 @@ class Accumulator {
 
   double Sum() const { return sum_; }
 
+  /**
+   * @brief 整体求平均
+   *
+   * @return double
+   */
   double Mean() const { return sum_ / totalsamples_; }
 
+  /**
+   * @brief 滑窗求平均
+   *
+   * @return double
+   */
   double RollingMean() const {
     return window_sum_ / std::min(window_samples_, N);
   }
@@ -80,6 +91,11 @@ class Accumulator {
 
   double Min() const { return min_; }
 
+  /**
+   * @brief 方差
+   *
+   * @return double
+   */
   double LazyVariance() const {
     if (window_samples_ == 0) {
       return 0.0;
@@ -107,6 +123,7 @@ struct TimerMapValue {
   TimerMapValue() {}
 
   /// Create an accumulator with specified window size.
+  //一个特定大小的累加器
   Accumulator<double, double, 50> acc_;
 };
 
@@ -142,10 +159,10 @@ class Timer {
   bool IsTiming() const;
 
  private:
-  std::chrono::time_point<std::chrono::system_clock> time_;
+  std::chrono::time_point<std::chrono::system_clock> time_;  //记录开始时间
 
-  bool timing_;
-  size_t handle_;
+  bool timing_;    //记录是否开始计时
+  size_t handle_;  //对应一个string字符串类型的计时
 };
 
 class Timing {
@@ -187,10 +204,10 @@ class Timing {
 
   typedef AlignedVector<TimerMapValue> list_t;
 
-  list_t timers_;
-  map_t tagMap_;
+  list_t timers_;  //一个统计表，每个size_t handle对应一份
+  map_t tagMap_;   // string与handle的查询表
   size_t maxTagLength_;
-  std::mutex mutex_;
+  std::mutex mutex_;  //线程锁
 };
 
 #if ENABLE_MSF_TIMING
