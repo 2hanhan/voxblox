@@ -88,6 +88,14 @@ void TsdfIntegratorBase::setLayer(Layer<TsdfVoxel>* layer) {
 // mutex allowing it to grow during integration.
 // These temporary blocks can be merged into the layer later by calling
 // updateLayerWithStoredBlocks()
+/**
+ * @brief 返回指向位于tsdf层中global_voxel_idx处的指针
+ *
+ * @param global_voxel_idx
+ * @param last_block
+ * @param last_block_idx
+ * @return TsdfVoxel*
+ */
 TsdfVoxel* TsdfIntegratorBase::allocateStorageAndGetVoxelPtr(
     const GlobalIndex& global_voxel_idx, Block<TsdfVoxel>::Ptr* last_block,
     BlockIndex* last_block_idx) {
@@ -248,6 +256,12 @@ float TsdfIntegratorBase::computeDistance(const Point& origin,
 }
 
 // Thread safe.
+/**
+ * @brief 计算单个点权重
+ *
+ * @param point_C
+ * @return float
+ */
 float TsdfIntegratorBase::getVoxelWeight(const Point& point_C) const {
   if (config_.use_const_weight) {
     return 1.0f;
@@ -474,14 +488,16 @@ void MergedTsdfIntegrator::integrateVoxel(
                        config_.voxel_carving_enabled, config_.max_ray_length_m,
                        voxel_size_inv_, config_.default_truncation_distance);
 
-  GlobalIndex global_voxel_idx;
+  GlobalIndex global_voxel_idx;  //获取体素的全局索引
   while (ray_caster.nextRayIndex(&global_voxel_idx)) {
     if (enable_anti_grazing) {
       // Check if this one is already the the block hash map for this
       // insertion. Skip this to avoid grazing.
-      //如果已经存在hashmap映射则跳过
-      if ((clearing_ray || global_voxel_idx != kv.first) &&
-          voxel_map.find(global_voxel_idx) != voxel_map.end()) {
+      //
+      if ((clearing_ray || global_voxel_idx != kv.first)  // first point会跳过
+          && voxel_map.find(global_voxel_idx) !=
+                 voxel_map.end())  //如果已经存在hashmap映射则跳过
+      {
         continue;
       }
     }
@@ -528,6 +544,7 @@ void MergedTsdfIntegrator::integrateVoxels(
   }
 
   for (size_t i = 0; i < map_size; ++i) {
+    //个数%线程数，每个线程间隔线程数个个数取点
     if (((i + thread_idx + 1) % config_.integrator_threads) == 0) {
       integrateVoxel(T_G_C, points_C, colors, enable_anti_grazing, clearing_ray,
                      *it, voxel_map);
@@ -539,9 +556,9 @@ void MergedTsdfIntegrator::integrateVoxels(
 /**
  * @brief 多线程的射线投影
  *
- * @param T_G_C
- * @param points_C
- * @param colors
+ * @param T_G_C 当前点云坐标变换
+ * @param points_C 点云
+ * @param colors 颜色信息
  * @param enable_anti_grazing
  * @param clearing_ray
  * @param voxel_map

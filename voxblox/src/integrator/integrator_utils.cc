@@ -78,12 +78,13 @@ size_t SortedThreadSafeIndex::getNextIndexImpl(size_t sequential_idx) {
  * This class assumes PRE-SCALED coordinates, where one unit = one voxel size.
  * The indices are also returned in this scales coordinate system, which should
  * map to voxel indices.
- * @param origin
- * @param point_G
- * @param is_clearing_ray
+ * @param origin 相机位姿
+ * @param point_G 输入点云生成的voxel内所有点加权后的位姿
+ * @param is_clearing_ray true
+ * 射线终点：表面接近相机Td的位置，false射线终点：表面远离td位置。
  * @param voxel_carving_enabled 射线的开始点为原点(voxel_carving_enabled==true)
- * @param max_ray_length_m
- * @param voxel_size_inv
+ * @param max_ray_length_m 最大射线长度
+ * @param voxel_size_inv  输入点云生成的voxel的大小的倒数
  * @param truncation_distance 截断距离
  * @param cast_from_origin 从原点开始，还是从终点开始，voxel索引的范围
  */
@@ -105,17 +106,22 @@ RayCaster::RayCaster(const Point& origin, const Point& point_G,
             ray_length -
                 truncation_distance,  //射线长度减去截断距离，截断距离就是平面的+-Td的
             static_cast<FloatingPoint>(0.0)),  //和0比较把距离相机太近的去除掉
-        max_ray_length_m);
-    //终止点为平均点后unit_ray * truncation_distance的位置。
+        max_ray_length_m);  //不能超过射线的最大距离
+
+    //终点：平均点 - unit_ray *
+    // truncation_distance的位置。表面距离相机原点近一点
     ray_end = origin + unit_ray * ray_length;
     //是否是从相机开始的射线
-    ray_start = voxel_carving_enabled ? origin : ray_end;
+    ray_start = voxel_carving_enabled ? origin :  //原点
+                    ray_end;                      //表面接近相机Td
   } else {
-    // else中除了没计算ray_length,其他的虽然公式不一样但是结果都是一样的
+    // 终点：平均点 + unit_ray * truncation_distance。表面距离相机原点远一点
+    // 就是说距离相机原点，超过射线原点还没有检测到平面，需要把原来的平面清除了
     ray_end = point_G + unit_ray * truncation_distance;
-    ray_start = voxel_carving_enabled
-                    ? origin
-                    : (point_G - unit_ray * truncation_distance);
+    ray_start =
+        voxel_carving_enabled
+            ? origin                                       //原点
+            : (point_G - unit_ray * truncation_distance);  //表面接近相机Td
   }
 
   // voxel的索引范围，位置/voxel大小
@@ -136,7 +142,7 @@ RayCaster::RayCaster(const Point& start_scaled, const Point& end_scaled) {
 /**
  * @brief returns false if ray terminates at ray_index, true otherwise
  * 如果搜索完成index就返回false
- * @param ray_index
+ * @param ray_index 射线投影获得的voxel的索引
  * @return true
  * @return false
  */
@@ -156,8 +162,15 @@ bool RayCaster::nextRayIndex(GlobalIndex* ray_index) {
   return true;
 }
 
+/**
+ * @brief
+ *
+ * @param start_scaled  按照voxel_size_inv计算索引后的射线起点
+ * @param end_scaled 按照voxel_size_inv计算索引后的射线终点
+ */
 void RayCaster::setupRayCaster(const Point& start_scaled,
                                const Point& end_scaled) {
+  // 终点or起点坐标异常直接返回
   if (std::isnan(start_scaled.x()) || std::isnan(start_scaled.y()) ||
       std::isnan(start_scaled.z()) || std::isnan(end_scaled.x()) ||
       std::isnan(end_scaled.y()) || std::isnan(end_scaled.z())) {
@@ -168,7 +181,7 @@ void RayCaster::setupRayCaster(const Point& start_scaled,
   //首先获取射线开始位置和结束位置对应的voxel的三个方向的index的坐标以及差值
   curr_index_ = getGridIndexFromPoint<GlobalIndex>(start_scaled);
   const GlobalIndex end_index = getGridIndexFromPoint<GlobalIndex>(end_scaled);
-  const GlobalIndex diff_index = end_index - curr_index_;
+  const GlobalIndex diff_index = end_index - curr_index_;  //索引变化范围
 
   current_step_ = 0;
 
