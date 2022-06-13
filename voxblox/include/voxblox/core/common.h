@@ -163,6 +163,14 @@ inline IndexType getGridIndexFromPoint(const Point& point,
  * function doesn't always compute the correct grid index for coordinates
  * near the grid cell boundaries.
  */
+
+/**
+ * @brief Get the Grid Index From Point object
+ * 由于float数据类型精度的问题，所以取近似的坐标
+ * @tparam IndexType
+ * @param scaled_point
+ * @return IndexType
+ */
 template <typename IndexType>
 inline IndexType getGridIndexFromPoint(const Point& scaled_point) {
   return IndexType(std::floor(scaled_point.x() + kEpsilon),

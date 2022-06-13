@@ -78,6 +78,7 @@ size_t SortedThreadSafeIndex::getNextIndexImpl(size_t sequential_idx) {
  * This class assumes PRE-SCALED coordinates, where one unit = one voxel size.
  * The indices are also returned in this scales coordinate system, which should
  * map to voxel indices.
+ * 设置射线投影的起点终点、并计算设置步长
  * @param origin 相机位姿
  * @param point_G 输入点云生成的voxel内所有点加权后的位姿
  * @param is_clearing_ray true
@@ -147,6 +148,7 @@ RayCaster::RayCaster(const Point& start_scaled, const Point& end_scaled) {
  * @return false
  */
 bool RayCaster::nextRayIndex(GlobalIndex* ray_index) {
+  //如果射线投影到达最大距离则返回
   if (current_step_++ > ray_length_in_steps_) {
     return false;
   }
@@ -154,16 +156,20 @@ bool RayCaster::nextRayIndex(GlobalIndex* ray_index) {
   DCHECK(ray_index != nullptr);
   *ray_index = curr_index_;
 
+  //获取t_to_next_boundary_中最小的数的索引
+  //每次只取一个轴进行，按照射线方向的步长进行移动
   int t_min_idx;
   t_to_next_boundary_.minCoeff(&t_min_idx);
-  curr_index_[t_min_idx] += ray_step_signs_[t_min_idx];
+
+  curr_index_[t_min_idx] += ray_step_signs_[t_min_idx];  //更新索引
+
   t_to_next_boundary_[t_min_idx] += t_step_size_[t_min_idx];
 
   return true;
 }
 
 /**
- * @brief
+ * @brief 设置射线搜索的步长信息
  *
  * @param start_scaled  按照voxel_size_inv计算索引后的射线起点
  * @param end_scaled 按照voxel_size_inv计算索引后的射线终点
@@ -186,24 +192,30 @@ void RayCaster::setupRayCaster(const Point& start_scaled,
   current_step_ = 0;
 
   ray_length_in_steps_ = std::abs(diff_index.x()) + std::abs(diff_index.y()) +
-                         std::abs(diff_index.z());
+                         std::abs(diff_index.z());  //所有的dx+dy+dz的总和
 
-  const Ray ray_scaled = end_scaled - start_scaled;
+  const Ray ray_scaled = end_scaled - start_scaled;  //射线矢量
 
   // 每个维度(x,y,z)只可能为3个值, 1,-1或者0.
+  //查看射线x，y，z的变化方向，正方向为1，负方向为-1，不变为0
   ray_step_signs_ = AnyIndex(signum(ray_scaled.x()), signum(ray_scaled.y()),
                              signum(ray_scaled.z()));
 
+  //?值保留正的为1，负的设置为0
   const AnyIndex corrected_step(std::max(0, ray_step_signs_.x()),
                                 std::max(0, ray_step_signs_.y()),
                                 std::max(0, ray_step_signs_.z()));
 
+  //计算坐标相对于初始位置的偏移量乘
   const Point start_scaled_shifted =
       start_scaled - curr_index_.cast<FloatingPoint>();
 
+  //射线方向，
+  //?貌似是记录每个坐标绝对偏移量的增量
   Ray distance_to_boundaries(corrected_step.cast<FloatingPoint>() -
                              start_scaled_shifted);
 
+  //按照其他的代码理解应该是初始的具体步长一个轴的增量
   t_to_next_boundary_ = Ray((std::abs(ray_scaled.x()) < 0.0)
                                 ? 2.0
                                 : distance_to_boundaries.x() / ray_scaled.x(),
@@ -216,6 +228,8 @@ void RayCaster::setupRayCaster(const Point& start_scaled,
 
   // Distance to cross one grid cell along the ray in t.
   // Same as absolute inverse value of delta_coord.
+  //[射线矢量的abs<0.0 ]?[2.0]:[射线矢量模的倒数]
+  //防止分母过小取倒数为正无穷
   t_step_size_ = Ray(
       (std::abs(ray_scaled.x()) < 0.0) ? 2.0
                                        : ray_step_signs_.x() / ray_scaled.x(),

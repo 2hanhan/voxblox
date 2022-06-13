@@ -476,19 +476,23 @@ void MergedTsdfIntegrator::integrateVoxel(
     merged_weight += point_weight;
 
     // only take first point when clearing
+    // claering_ray为真只处理第一个点
     if (clearing_ray) {
       break;
     }
   }
 
-  const Point merged_point_G = T_G_C * merged_point_C;
+  const Point merged_point_G = T_G_C * merged_point_C;  //加权后voxel内点的位姿
 
   //利用平均点投影射线
+  //构造函数，计算射线起始点终点、计算射线步长
   RayCaster ray_caster(origin, merged_point_G, clearing_ray,
                        config_.voxel_carving_enabled, config_.max_ray_length_m,
                        voxel_size_inv_, config_.default_truncation_distance);
 
-  GlobalIndex global_voxel_idx;  //获取体素的全局索引
+  GlobalIndex global_voxel_idx;
+
+  //获取体素的全局索引
   while (ray_caster.nextRayIndex(&global_voxel_idx)) {
     if (enable_anti_grazing) {
       // Check if this one is already the the block hash map for this
@@ -536,6 +540,7 @@ void MergedTsdfIntegrator::integrateVoxels(
   LongIndexHashMapType<AlignedVector<size_t>>::type::const_iterator it;
   size_t map_size;
   if (clearing_ray) {
+    //判断clearing ray标志为
     it = clear_map.begin();
     map_size = clear_map.size();
   } else {
@@ -562,7 +567,7 @@ void MergedTsdfIntegrator::integrateVoxels(
  * @param enable_anti_grazing
  * @param clearing_ray
  * @param voxel_map
- * @param clear_map
+ * @param clear_map 当前voxel中是否只取第一个点
  */
 void MergedTsdfIntegrator::integrateRays(
     const Transformation& T_G_C, const Pointcloud& points_C,
