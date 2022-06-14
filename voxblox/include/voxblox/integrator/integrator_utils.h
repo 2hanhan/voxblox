@@ -116,10 +116,10 @@ class RayCaster {
  private:
   void setupRayCaster(const Point& start_scaled, const Point& end_scaled);
 
-  Ray t_to_next_boundary_;
-  GlobalIndex curr_index_;
-  AnyIndex ray_step_signs_;
-  Ray t_step_size_;
+  Ray t_to_next_boundary_;   //记录每个坐标归一化后的增量位置
+  GlobalIndex curr_index_;   //当前搜索的索引
+  AnyIndex ray_step_signs_;  //射线搜索符号函数
+  Ray t_step_size_;          //射线搜索归一化步长
 
   uint ray_length_in_steps_;
   uint current_step_;

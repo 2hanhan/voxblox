@@ -163,8 +163,12 @@ bool RayCaster::nextRayIndex(GlobalIndex* ray_index) {
 
   curr_index_[t_min_idx] += ray_step_signs_[t_min_idx];  //更新索引
 
+  //更新位置索引增量=+绝对步长
   t_to_next_boundary_[t_min_idx] += t_step_size_[t_min_idx];
-
+  //! 这块就是理解不了
+  //! 1. 第一个的 t_to_next_boundary_ 的值就很奇怪
+  //! 2. 每次取min的
+  //! t_to_next_boundary_的列，t_to_next_boundary_是绝对位置的增量，每次取min列，这射线的方向也不对啊，有的轴增量小把dx加完了也比不上其他的轴一次的大小啊
   return true;
 }
 
@@ -201,21 +205,21 @@ void RayCaster::setupRayCaster(const Point& start_scaled,
   ray_step_signs_ = AnyIndex(signum(ray_scaled.x()), signum(ray_scaled.y()),
                              signum(ray_scaled.z()));
 
-  //?值保留正的为1，负的设置为0
+  //?值保留正的为1，负的设置为0，感觉初始位置index增量就是随便取了一个不为负数就行
   const AnyIndex corrected_step(std::max(0, ray_step_signs_.x()),
                                 std::max(0, ray_step_signs_.y()),
                                 std::max(0, ray_step_signs_.z()));
 
-  //计算坐标相对于初始位置的偏移量乘
+  //计算坐标相对于初始位置的偏移量，主要就是取个近似计算呗
+  // start_scaled，curr_index_应该是近似相等的
   const Point start_scaled_shifted =
       start_scaled - curr_index_.cast<FloatingPoint>();
 
-  //射线方向，
-  //?貌似是记录每个坐标绝对偏移量的增量
+  //第一个绝对坐标值增量值
   Ray distance_to_boundaries(corrected_step.cast<FloatingPoint>() -
                              start_scaled_shifted);
 
-  //按照其他的代码理解应该是初始的具体步长一个轴的增量
+  //第一个归一化的坐标增量值
   t_to_next_boundary_ = Ray((std::abs(ray_scaled.x()) < 0.0)
                                 ? 2.0
                                 : distance_to_boundaries.x() / ray_scaled.x(),
@@ -230,6 +234,13 @@ void RayCaster::setupRayCaster(const Point& start_scaled,
   // Same as absolute inverse value of delta_coord.
   //[射线矢量的abs<0.0 ]?[2.0]:[射线矢量模的倒数]
   //防止分母过小取倒数为正无穷
+  //归一化，坐标增量，dx+dy+dz = 16，结合nextRayIndex函数
+  //举个栗子：假设ray_scale =10，5，1
+  // x：[0.0][0.1][0.2][0.3][0.4][0.5][0.6][0.7][0.8][0.9][1.0]
+  // y：[0.0][.....][0.2][.....][0.4][.....][0.6][.....][0.8][.....][1.0]
+  // z：[0.0][.....][.....][.....][.....][.....][.....][.....][.....][.....][1.0]
+  //为了使得x，y，z成比例增加，这样才能是直线
+  //所以每次增加t_to_next_boundary_中最小的一个
   t_step_size_ = Ray(
       (std::abs(ray_scaled.x()) < 0.0) ? 2.0
                                        : ray_step_signs_.x() / ray_scaled.x(),
