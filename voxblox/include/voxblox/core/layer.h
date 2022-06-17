@@ -17,8 +17,11 @@
 namespace voxblox {
 
 /**
- * A 3D information layer, containing data of type VoxelType stored in blocks.
- * This class contains functions for manipulating and accessing these blocks.
+ * @brief A 3D information layer, containing data of type VoxelType stored in
+ * blocks. This class contains functions for manipulating and accessing these
+ * blocks.
+ * 三维信息层，包含存储在块中的体素类型数据。此类包含用于操作和访问这些块的函数。
+ * @tparam VoxelType
  */
 template <typename VoxelType>
 class Layer {
@@ -27,8 +30,8 @@ class Layer {
 
   typedef std::shared_ptr<Layer> Ptr;
   typedef Block<VoxelType> BlockType;
-  typedef
-      typename AnyIndexHashMapType<typename BlockType::Ptr>::type BlockHashMap;
+  typedef typename AnyIndexHashMapType<typename BlockType::Ptr>::type
+      BlockHashMap;  // hash map 格式存储的block
   typedef typename std::pair<BlockIndex, typename BlockType::Ptr> BlockMapPair;
 
   explicit Layer(FloatingPoint voxel_size, size_t voxels_per_side)

@@ -9,6 +9,13 @@
 
 namespace voxblox {
 
+/**
+ * @brief DECO 散列计算hash映射
+ *
+ * @tparam VoxelType
+ * @param index
+ * @return size_t
+ */
 template <typename VoxelType>
 size_t Block<VoxelType>::computeLinearIndexFromVoxelIndex(
     const VoxelIndex& index) const {

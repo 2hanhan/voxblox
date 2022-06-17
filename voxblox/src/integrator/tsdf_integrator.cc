@@ -90,10 +90,11 @@ void TsdfIntegratorBase::setLayer(Layer<TsdfVoxel>* layer) {
 // updateLayerWithStoredBlocks()
 /**
  * @brief 返回指向位于tsdf层中global_voxel_idx处的指针
- *
- * @param global_voxel_idx
- * @param last_block
- * @param last_block_idx
+ * - 根据全局索引获得block
+ * - 当前点云的voxel对应临时block
+ * @param global_voxel_idx 全局索引
+ * @param last_block 上一个体素块
+ * @param last_block_idx 上一个体素块索引
  * @return TsdfVoxel*
  */
 TsdfVoxel* TsdfIntegratorBase::allocateStorageAndGetVoxelPtr(
@@ -112,6 +113,7 @@ TsdfVoxel* TsdfIntegratorBase::allocateStorageAndGetVoxelPtr(
 
   // If no block at this location currently exists, we allocate a temporary
   // voxel that will be merged into the map later
+  //如果此位置当前不存在块，分配一个临时体素，稍后将其合并到地图中
   if (*last_block == nullptr) {
     // To allow temp_block_map_ to grow we can only let one thread in at once
     std::lock_guard<std::mutex> lock(temp_block_mutex_);
@@ -119,8 +121,9 @@ TsdfVoxel* TsdfIntegratorBase::allocateStorageAndGetVoxelPtr(
     typename Layer<TsdfVoxel>::BlockHashMap::iterator it =
         temp_block_map_.find(block_idx);
     if (it != temp_block_map_.end()) {
-      *last_block = it->second;
+      *last_block = it->second;  //取出对应的block
     } else {
+      // emplace(key,value)插入元素，没有先创建后拷贝的操作效率更高
       auto insert_status = temp_block_map_.emplace(
           block_idx, std::make_shared<Block<TsdfVoxel>>(
                          voxels_per_side_, voxel_size_,
@@ -129,7 +132,7 @@ TsdfVoxel* TsdfIntegratorBase::allocateStorageAndGetVoxelPtr(
       DCHECK(insert_status.second) << "Block already exists when allocating at "
                                    << block_idx.transpose();
 
-      *last_block = insert_status.first->second;
+      *last_block = insert_status.first->second;  //取出新创建的block
     }
   }
 
@@ -157,11 +160,11 @@ void TsdfIntegratorBase::updateLayerWithStoredBlocks() {
 /**
  * @brief Updates tsdf_voxel. Thread safe.
  * 使用tsdf更新voxel
- * @param origin
+ * @param origin 相机原点
  * @param point_G 世界坐标系下的点
- * @param global_voxel_idx
- * @param color
- * @param weight
+ * @param global_voxel_idx 全局的voxel索引
+ * @param color 颜色
+ * @param weight 权重
  * @param tsdf_voxel
  */
 void TsdfIntegratorBase::updateTsdfVoxel(const Point& origin,
@@ -175,9 +178,7 @@ void TsdfIntegratorBase::updateTsdfVoxel(const Point& origin,
   const Point voxel_center =
       getCenterPointFromGridIndex(global_voxel_idx, voxel_size_);
 
-  //计算voxel中心到原点的直线距离，计算观察到的平均点到原点的直线距离。
-  //原点到voxel的射线和平均点到原点的射线一般不会完全共线，
-  //因此在这个函数里会voxel的射线投影到平均点的射线上，再做个减法获得sdf。
+  //计算获得sdf。
   const float sdf = computeDistance(origin, point_G, voxel_center);
 
   float updated_weight = weight;
@@ -240,7 +241,17 @@ void TsdfIntegratorBase::updateTsdfVoxel(const Point& origin,
 // To do this, project the voxel_center onto the ray from origin to point G.
 // Then check if the the magnitude of the vector is smaller or greater than
 // the original distance...
-// voxel是在平面的前面还是后面
+
+/**
+ * @brief
+ * 计算sdf值判断，voxel是在平面的前面还是后面。
+ * 具体方法是将voxel中心投影到点构成的射线上，
+ * 计算二者的差值
+ * @param origin
+ * @param point_G
+ * @param voxel_center
+ * @return float sdf值
+ */
 float TsdfIntegratorBase::computeDistance(const Point& origin,
                                           const Point& point_G,
                                           const Point& voxel_center) const {
@@ -249,8 +260,10 @@ float TsdfIntegratorBase::computeDistance(const Point& origin,
 
   const FloatingPoint dist_G = v_point_origin.norm();
   // projection of a (v_voxel_origin) onto b (v_point_origin)
+  // voxel中心的射线投影到直接的点射线
   const FloatingPoint dist_G_V = v_voxel_origin.dot(v_point_origin) / dist_G;
 
+  //点的减去voxel中心的，大于0voxel在表面上，否则
   const float sdf = static_cast<float>(dist_G - dist_G_V);
   return sdf;
 }
@@ -348,7 +361,7 @@ void SimpleTsdfIntegrator::integrateFunction(const Transformation& T_G_C,
 
 /**
  * @brief
- * Merged方法先计算哪些3d点投影到了相同的voxel里，
+ * - Merged方法先计算哪些3d点投影到了相同的voxel里，
  * 然后取这些点的坐标平均数，视为一个点，只从那个平均点投影射线更新。
  *
  * @param T_G_C
@@ -414,7 +427,7 @@ void MergedTsdfIntegrator::bundleRays(
     bool is_clearing;
     //距离相机太近或太远之类，不Valid
     if (!isPointValid(point_C, freespace_points, &is_clearing)) {
-      continue;
+      continue;  //清除不valid的点
     }
 
     const Point point_G = T_G_C * point_C;  // 转换到世界坐标系下
@@ -423,7 +436,7 @@ void MergedTsdfIntegrator::bundleRays(
         point_G, voxel_size_inv_);  //计算世界坐标系下的点在哪个voxel里
 
     if (is_clearing) {
-      (*clear_map)[voxel_index].push_back(point_idx);  //清除不valid的点
+      (*clear_map)[voxel_index].push_back(point_idx);
     } else {
       (*voxel_map)[voxel_index].push_back(
           point_idx);  // 投影到一个voxel_index下的不同poin_idx都会被push到voxel_map里。
@@ -437,7 +450,7 @@ void MergedTsdfIntegrator::bundleRays(
 
 /**
  * @brief 遍历一个voxel中所有的点，求取平均参数，进行tsdf的voxel生成更新
- *
+ * - 计算射线投影遍历体素，进行tsdf更新
  * @param T_G_C
  * @param points_C
  * @param colors
@@ -476,7 +489,7 @@ void MergedTsdfIntegrator::integrateVoxel(
     merged_weight += point_weight;
 
     // only take first point when clearing
-    // claering_ray为真只处理第一个点
+    // clearing_ray为真只处理第一个点
     if (clearing_ray) {
       break;
     }
@@ -508,9 +521,7 @@ void MergedTsdfIntegrator::integrateVoxel(
 
     Block<TsdfVoxel>::Ptr block = nullptr;
     BlockIndex block_idx;
-    //检测该voxel是否已经属于某个block还是并不属于任何一个block，
-    //如果不，则新建一个block分配空间。
-    //返回在这个block里的对应index的voxel
+    //返回由输入点云生成的在这个block里的对应index的voxel
     TsdfVoxel* voxel =
         allocateStorageAndGetVoxelPtr(global_voxel_idx, &block, &block_idx);
 
@@ -521,7 +532,7 @@ void MergedTsdfIntegrator::integrateVoxel(
 
 /**
  * @brief 遍历所有的voxels
- *
+ * - merged方式的遍历所有的voxels
  * @param T_G_C
  * @param points_C
  * @param colors
@@ -560,7 +571,7 @@ void MergedTsdfIntegrator::integrateVoxels(
 
 /**
  * @brief 多线程的射线投影
- *
+ * - merged方式的多线程射线投影
  * @param T_G_C 当前点云坐标变换
  * @param points_C 点云
  * @param colors 颜色信息

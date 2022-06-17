@@ -17,8 +17,15 @@ namespace Update {
 enum Status { kMap, kMesh, kEsdf, kCount };
 }  // namespace Update
 
-/** An n x n x n container holding VoxelType. It is aware of its 3D position and
- * contains functions for accessing voxels by position and index */
+/**  */
+
+/**
+ * @brief An n x n x n container holding VoxelType. It is aware of its 3D
+ * position and contains functions for accessing voxels by position and index
+ * 包含体素类型的n^3容器。它知道其三维位置，并包含通过位置和索引访问体素的功能
+ *
+ * @tparam VoxelType
+ */
 template <typename VoxelType>
 class Block {
  public:
@@ -188,7 +195,7 @@ class Block {
   size_t getMemorySize() const;
 
  protected:
-  std::unique_ptr<VoxelType[]> voxels_;
+  std::unique_ptr<VoxelType[]> voxels_;  // block中的具体的voxel
 
   // Derived, cached parameters.
   size_t num_voxels_;
@@ -201,16 +208,18 @@ class Block {
   void serializeProto(BlockProto* proto) const;
 
   // Base parameters.
-  const size_t voxels_per_side_;
-  const FloatingPoint voxel_size_;
+  const size_t voxels_per_side_;    //每个block包含voxels_per_side_^3
+                                    //个体素，也是DECO散列参数sl
+  const FloatingPoint voxel_size_;  //每个体素边长的大小
   Point origin_;
 
   // Derived, cached parameters.
-  FloatingPoint voxel_size_inv_;
-  FloatingPoint block_size_;
-  FloatingPoint block_size_inv_;
+  FloatingPoint voxel_size_inv_;//voxel边长大小的倒数
+  FloatingPoint block_size_;  // block的边长大小
+  FloatingPoint block_size_inv_;//block的边长大小的倒数
 
   /// Is set to true when data is updated.
+  // 数据更新的标志位
   std::bitset<Update::kCount> updated_;
 };
 

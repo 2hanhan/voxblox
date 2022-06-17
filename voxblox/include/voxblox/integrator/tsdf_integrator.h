@@ -108,18 +108,29 @@ class TsdfIntegratorBase {
   void setLayer(Layer<TsdfVoxel>* layer);
 
  protected:
-  /// Thread safe.
+  /**
+   * @brief Thread safe.
+   * 排除外点
+   * 
+   * @param point_C
+   * @param freespace_point
+   * @param is_clearing
+   * @return true
+   * @return false
+   */
   inline bool isPointValid(const Point& point_C, const bool freespace_point,
                            bool* is_clearing) const {
     DCHECK(is_clearing != nullptr);
     const FloatingPoint ray_distance = point_C.norm();
     if (ray_distance < config_.min_ray_length_m) {
+      //射线距离太近
       return false;
     } else if (ray_distance > config_.max_ray_length_m) {
       if (config_.allow_clear || freespace_point) {
         *is_clearing = true;
         return true;
       } else {
+        //射线距离太远
         return false;
       }
     } else {
@@ -172,7 +183,7 @@ class TsdfIntegratorBase {
   FloatingPoint block_size_;
 
   // Derived types.
-  FloatingPoint voxel_size_inv_;
+  FloatingPoint voxel_size_inv_;  // voxel体素大小，用来切块定义索引坐标
   FloatingPoint voxels_per_side_inv_;
   FloatingPoint block_size_inv_;
 
@@ -181,7 +192,8 @@ class TsdfIntegratorBase {
    * Temporary block storage, used to hold blocks that need to be created while
    * integrating a new pointcloud
    */
-  Layer<TsdfVoxel>::BlockHashMap temp_block_map_;
+  Layer<TsdfVoxel>::BlockHashMap
+      temp_block_map_;  //临时块存储，用于保存在集成新的点云时需要创建的块
 
   /**
    * We need to prevent simultaneous access to the voxels in the map. We could

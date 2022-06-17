@@ -161,14 +161,10 @@ bool RayCaster::nextRayIndex(GlobalIndex* ray_index) {
   int t_min_idx;
   t_to_next_boundary_.minCoeff(&t_min_idx);
 
-  curr_index_[t_min_idx] += ray_step_signs_[t_min_idx];  //更新索引
+  curr_index_[t_min_idx] += ray_step_signs_[t_min_idx];  //更新全局索引global_voxel_idx
 
-  //更新位置索引增量=+绝对步长
+  //更新归一化增量坐标
   t_to_next_boundary_[t_min_idx] += t_step_size_[t_min_idx];
-  //! 这块就是理解不了
-  //! 1. 第一个的 t_to_next_boundary_ 的值就很奇怪
-  //! 2. 每次取min的
-  //! t_to_next_boundary_的列，t_to_next_boundary_是绝对位置的增量，每次取min列，这射线的方向也不对啊，有的轴增量小把dx加完了也比不上其他的轴一次的大小啊
   return true;
 }
 

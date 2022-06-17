@@ -143,12 +143,9 @@ inline void castRay(const Point& start_scaled, const Point& end_scaled,
 }
 
 /**
- * Takes start and end in WORLD COORDINATES, does all pre-scaling and
+ * @brief Takes start and end in WORLD COORDINATES, does all pre-scaling and
  * sorting into hierarhical index.
- */
-
-/**
- * @brief 以世界坐标为起点和终点，对层次索引进行所有预缩放和排序。
+ * 以世界坐标为起点和终点，对层次索引进行所有预缩放和排序。
  *
  * @param start
  * @param end

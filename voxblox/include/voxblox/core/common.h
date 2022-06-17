@@ -166,7 +166,7 @@ inline IndexType getGridIndexFromPoint(const Point& point,
 
 /**
  * @brief Get the Grid Index From Point object
- * 由于float数据类型精度的问题，所以取近似的坐标
+ * 由于float数据类型精度的问题，所以取近似的坐标，用于获取global_voxel_idx
  * @tparam IndexType
  * @param scaled_point
  * @return IndexType
@@ -200,6 +200,14 @@ inline Point getCenterPointFromGridIndex(const IndexType& idx,
                (static_cast<FloatingPoint>(idx.z()) + 0.5) * grid_size);
 }
 
+/**
+ * @brief 将索引值index恢复真实的坐标位置
+ *
+ * @tparam IndexType
+ * @param idx
+ * @param grid_size
+ * @return Point
+ */
 template <typename IndexType>
 inline Point getOriginPointFromGridIndex(const IndexType& idx,
                                          FloatingPoint grid_size) {
@@ -220,6 +228,13 @@ inline GlobalIndex getGlobalVoxelIndexFromBlockAndVoxelIndex(
                      voxel_index.cast<LongIndexElement>());
 }
 
+/**
+ * @brief Get the Block Index From Global Voxel Index object
+ * 根据global索引返回块的索引
+ * @param global_voxel_idx 全局体素索引
+ * @param voxels_per_side_inv
+ * @return BlockIndex
+ */
 inline BlockIndex getBlockIndexFromGlobalVoxelIndex(
     const GlobalIndex& global_voxel_idx, FloatingPoint voxels_per_side_inv) {
   return BlockIndex(
@@ -234,9 +249,14 @@ inline BlockIndex getBlockIndexFromGlobalVoxelIndex(
 inline bool isPowerOfTwo(int x) { return (x & (x - 1)) == 0; }
 
 /**
+ * @brief 将全局体素索引转换为块内的索引。
+ * 假设每侧体素数为2的幂，并使用按位and作为模数运算符的廉价计算替代
  * Converts from a global voxel index to the index inside a block.
  * NOTE: assumes that voxels_per_side is a power of 2 and uses a bitwise and as
  * a computationally cheap substitute for the modulus operator
+ * @param global_voxel_idx
+ * @param voxels_per_side
+ * @return VoxelIndex
  */
 inline VoxelIndex getLocalFromGlobalVoxelIndex(
     const GlobalIndex& global_voxel_idx, const int voxels_per_side) {
