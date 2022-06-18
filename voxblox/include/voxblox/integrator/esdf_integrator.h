@@ -156,8 +156,8 @@ class EsdfIntegrator {
  protected:
   Config config_;
 
-  Layer<TsdfVoxel>* tsdf_layer_;
-  Layer<EsdfVoxel>* esdf_layer_;
+  Layer<TsdfVoxel>* tsdf_layer_;  // tsdf体素地图
+  Layer<EsdfVoxel>* esdf_layer_;  // esdf体素地图
 
   /**
    * Open Queue for incremental updates. Contains global voxel indices

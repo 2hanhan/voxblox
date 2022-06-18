@@ -111,7 +111,7 @@ class TsdfIntegratorBase {
   /**
    * @brief Thread safe.
    * 排除外点
-   * 
+   *
    * @param point_C
    * @param freespace_point
    * @param is_clearing
@@ -175,7 +175,7 @@ class TsdfIntegratorBase {
 
   Config config_;
 
-  Layer<TsdfVoxel>* layer_;
+  Layer<TsdfVoxel>* layer_;  // tsdf体素地图
 
   // Cached map config.
   FloatingPoint voxel_size_;
