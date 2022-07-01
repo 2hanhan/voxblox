@@ -295,7 +295,7 @@ class Layer {
 
   std::string getType() const;
 
-  BlockHashMap block_map_;
+  BlockHashMap block_map_; //tsdf地图点blocks
 };
 
 }  // namespace voxblox

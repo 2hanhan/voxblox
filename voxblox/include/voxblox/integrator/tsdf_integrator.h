@@ -193,7 +193,7 @@ class TsdfIntegratorBase {
    * integrating a new pointcloud
    */
   Layer<TsdfVoxel>::BlockHashMap
-      temp_block_map_;  //临时块存储，用于保存在集成新的点云时需要创建的块
+      temp_block_map_;  //临时块存储，用于保存在当前输入的新点云时创建的block
 
   /**
    * We need to prevent simultaneous access to the voxels in the map. We could

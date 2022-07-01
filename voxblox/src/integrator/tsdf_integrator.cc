@@ -144,22 +144,25 @@ TsdfVoxel* TsdfIntegratorBase::allocateStorageAndGetVoxelPtr(
   return &((*last_block)->getVoxelByVoxelIndex(local_voxel_idx));
 }
 
-// NOT thread safe
+/**
+ * @brief 更新临时的temp_block_map_到tsdf地图对应的layer_
+ * NOT thread safe
+ */
 void TsdfIntegratorBase::updateLayerWithStoredBlocks() {
   BlockIndex last_block_idx;
   Block<TsdfVoxel>::Ptr block = nullptr;
 
   for (const std::pair<const BlockIndex, Block<TsdfVoxel>::Ptr>&
            temp_block_pair : temp_block_map_) {
-    layer_->insertBlock(temp_block_pair);
+    layer_->insertBlock(temp_block_pair);  //将临时的block更新到对应的tsdf地图
   }
 
-  temp_block_map_.clear();
+  temp_block_map_.clear();  //情况当前点云生成的临时block地图
 }
 
 /**
  * @brief Updates tsdf_voxel. Thread safe.
- * 使用tsdf更新voxel
+ * 计算tsdf更新临时的blocks中的voxel
  * @param origin 相机原点
  * @param point_G 世界坐标系下的点
  * @param global_voxel_idx 全局的voxel索引
