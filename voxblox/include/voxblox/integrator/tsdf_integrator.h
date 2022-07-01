@@ -175,7 +175,7 @@ class TsdfIntegratorBase {
 
   Config config_;
 
-  Layer<TsdfVoxel>* layer_;  // tsdf体素地图
+  Layer<TsdfVoxel>* layer_;  // tsdf体素地图，block形式
 
   // Cached map config.
   FloatingPoint voxel_size_;
